@@ -28,7 +28,21 @@ WORKDIR /var/www/html
 
 RUN docker-php-ext-install pdo pdo_mysql
 
-COPY public_html/index.php index.php
+# Install Composer
+RUN curl -sS https://getcomposer.org/installer | php -- --install-dir=/usr/local/bin --filename=composer
+
+# Copy and install dependencies
+COPY composer.json composer.lock ./
+RUN composer install --no-scripts --no-autoloader
+
+# Copy the rest of the application files
+COPY public_html/public/index.php index.php
+
+# Generate autoload files and other necessary scripts
+RUN composer dump-autoload --optimize
+RUN composer run-script post-install-cmd
+
+
 
 EXPOSE 80
 EXPOSE 443

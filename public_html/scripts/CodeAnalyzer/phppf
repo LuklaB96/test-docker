@@ -1,0 +1,102 @@
+<?php
+/**
+ * This script will output all public functions from all files in the specified directory.
+ * 
+ * It is in really early stage and should not be considered as good code or anything, no SOLID principles etc.
+ */
+require_once __DIR__ . '/../../vendor/autoload.php';
+
+use App\Lib\Config;
+
+echo 'Welcome to the Code Analyzer - Public Functions, this script will list all public functions in all .php files from targeted directory and sub directories.' . PHP_EOL;
+$input = readline('Do you want to run script? yes/no [yes]:');
+if ($input == 'yes' or $input == '') {
+    $filePath = Config::get('MAIN_DIR') . '/src'; // Change this to the path of the file you want to analyze
+    $results = checkForReturnStatements($filePath);
+
+    printResults($results);
+} else {
+    exit();
+}
+function checkForReturnStatements($dir)
+{
+    $files = scandir($dir);
+    $functionsByFile = [];
+    echo PHP_EOL . 'Checking all files in directory: ' . $dir . ':' . PHP_EOL;
+    foreach ($files as $file) {
+        if ($file !== '.' && $file !== '..') {
+            $filePath = $dir . '/' . $file;
+
+            if (is_dir($filePath)) {
+                $functionsByFile = array_merge($functionsByFile, checkForReturnStatements($filePath)); // Recursive call for subdirectories
+            } elseif (pathinfo($filePath, PATHINFO_EXTENSION) === 'php') {
+                echo 'Analyzing file: ' . $filePath;
+                $validSyntax = checkSyntaxErrors($filePath);
+                echo ' ..... ';
+                if ($validSyntax) {
+                    echo 'OK';
+                    $matches = [];
+                    $content = file_get_contents($filePath);
+
+
+                    $pattern = '/public\s+function\s+(\w+)\s*\([^)]*/'; //pattern looking for public function name e.g. public function functionName(...args) {code} will match and return functionName only.
+
+                    preg_match_all($pattern, $content, $matches);
+
+                    $functions = $matches[1];
+
+                    if (!empty($functions)) {
+                        $functionsByFile[$filePath] = $functions;
+                    }
+                } else {
+                    echo 'SYNTAX ERROR';
+                }
+                echo PHP_EOL;
+            }
+        }
+    }
+
+    return $functionsByFile;
+}
+
+function printResults($results)
+{
+    $maxFileLength = max(array_map('strlen', array_keys($results)));
+
+    foreach ($results as $file => $functions) {
+        $maxLength = max(array_map('strlen', $functions));
+        $totalLength = max($maxFileLength, $maxLength) + 4;
+
+        echo str_repeat('=', $totalLength + 2) . "\n";
+        echo "| " . str_pad($file, $totalLength - 2, ' ', STR_PAD_BOTH) . " |\n";
+        echo str_repeat('=', $totalLength + 2) . "\n";
+
+        foreach ($functions as $function) {
+            echo "| " . str_pad($function, $totalLength - 2, ' ', STR_PAD_BOTH) . " |\n";
+            echo str_repeat('-', $totalLength + 2) . "\n";
+        }
+    }
+}
+
+function checkSyntaxErrors($file_path)
+{
+    $output = exec("php -l " . escapeshellarg($file_path) . '2> /src');
+    if (strpos($output, 'No syntax errors detected') !== false) {
+        return true; // No syntax errors
+    } else {
+        return false; // Syntax errors found
+    }
+
+
+}
+function createEqualsLine($text)
+{
+    $textLength = strlen($text);
+    $equalsLength = max(0, $textLength); // Adjust 40 according to your desired line length
+
+    $equalsLine = str_repeat('=', $equalsLength);
+    return $equalsLine . PHP_EOL;
+}
+
+
+?>
